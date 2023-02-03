@@ -1,0 +1,259 @@
+Skip to content
+Search or jump to…
+Pull requests
+Issues
+Codespaces
+Marketplace
+Explore
+ 
+@mowjoejoejoejoe 
+mowjoejoejoejoe
+/
+ZachryTylerWood-Administrator-.it.git-ZachryTylerWood-Administrator-.it.git-REBITCORE-User-bin-Bash-
+Public
+Fork your own copy of mowjoejoejoejoe/ZachryTylerWood-Administrator-.it.git-ZachryTylerWood-Administrator-.it.git-REBITCORE-User-bin-Bash-
+Code
+Issues
+Pull requests
+Actions
+Projects
+Wiki
+Security
+Insights
+Settings
+ZachryTylerWood-Administrator-.it.git-ZachryTylerWood-Administrator-.it.git-REBITCORE-User-bin-Bash-/sample/parameters.md
+@mowjoejoejoejoe
+mowjoejoejoejoe Update parameters.md
+Latest commit 040a1d7 now
+ History
+ 1 contributor
+585 lines (556 sloc)  16.4 KB
+
+BEGIN'GLOW4':scripts:Build::"{{{{'$'' {[(((c)'.(r)).[12753750.[00]BITOE_34173.1337) ')]}}}":,:Build::'' :scriptspublish.yml ::Build::'Publish :'''Launch'' ':'''Deployee :'' 'document'' 'notification'' 'e-mail :zachryiixixiiwood'@gmail.com'' ''Release :repositories :dispatch :worksflow_call-on :dispatch '' ':''@mowjoejoejoejoe/mowjoejoejoejo'' ':Build::''RUN'' name: Test and Release
+
+Run this job on all pushes and pull requests
+as well as tags with a semantic version
+on: push: branches: - master tags: # normal versions - "v[0-9]+.[0-9]+.[0-9]+" # pre-releases - "v[0-9]+.[0-9]+.[0-9]+-**" pull_request: {}
+
+jobs: lint: if: contains(github.event.head_commit.message, '[skip ci]') == false
+
+    runs-on: ubuntu-latest
+
+    strategy:
+        matrix:
+            node-version: [14.x]
+
+    steps:
+        - name: Checkout code
+          uses: actions/checkout@v2
+
+        - name: Use Node.js ${{ matrix.node-version }}
+          uses: actions/setup-node@v2
+          with:
+              node-version: ${{ matrix.node-version }}
+              cache: 'yarn'
+
+        - name: Install Dependencies
+          run: yarn install --prefer-offline --frozen-lockfile
+
+        - name: Compile TypeScript code
+          run: yarn build
+
+        - name: Run linters
+          run: yarn lint
+
+# Runs unit tests on all supported node versions and OSes
+unit-tests:
+    if: contains(github.event.head_commit.message, '[skip ci]') == false
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+        matrix:
+            node-version: [12.x, 14.x, 16.x]
+            os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+        - name: Checkout code
+          uses: actions/checkout@v2
+
+          - name: Use Node.js ${{ matrix.node-version }}
+          uses: actions/setup-node@v2
+          with:
+              node-version: ${{ matrix.node-version }}
+              cache: 'yarn'
+
+        - name: Install Dependencies
+          run: yarn install --prefer-offline --frozen-lockfile
+
+        - name: Compile TypeScript code
+          run: yarn build
+
+        - name: Run unit tests
+          run: yarn test:ci
+
+# Deploys the final package to NPM
+deploy:
+    needs: [lint, unit-tests]
+
+    # Trigger this step only when a commit on any branch is tagged with a version number
+    if: |
+        contains(github.event.head_commit.message, '[skip ci]') == false &&
+        github.event_name == 'push' &&
+        startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    strategy:
+        matrix:
+            node-version: [14.x]
+
+    steps:
+        - name: Checkout code
+          uses: actions/checkout@v2
+
+        - name: Use Node.js ${{ matrix.node-version }}
+          uses: actions/setup-node@v2
+          with:
+              node-version: ${{ matrix.node-version }}
+              cache: 'yarn'
+
+        - name: Extract the version and commit body from the tag
+          id: extract_release
+          # The body may be multiline, therefore newlines and % need to be escaped
+          run: |
+              VERSION="${{ github.ref }}"
+              VERSION=${VERSION##*/v}
+              echo "::set-output name=VERSION::$VERSION"
+              BODY=$(git show -s --format=%b)
+              BODY="${BODY//'%'/'%25'}"
+              BODY="${BODY//$'\n'/'%0A'}"
+              BODY="${BODY//$'\r'/'%0D'}"
+              echo "::set-output name=BODY::$BODY"
+        - name: Install Dependencies
+          run: yarn install --prefer-offline --frozen-lockfile
+
+        - name: Create a clean build
+          run: yarn build
+
+        - name: Publish package to npm
+          run: |
+              npm config set //registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}
+              npm whoami
+              npm publish
+        - name: Create Github Release
+          uses: actions/create-release@v1
+          env:
+              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+              tag_name: ${{ github.ref }}
+              release_name: Release v${{ steps.extract_release.outputs.VERSION }}
+              draft: false
+              # Prerelease versions create prereleases on Github
+              prerelease: ${{ contains(steps.extract_release.outputs.VERSION, '-') }}
+              body: ${{ steps.extract_release.outputs.BODY }}
+27
+.gitignore @@ -0,0 +1,27 @@
+
+No dot-directories except github/vscode
+.*/ !.vscode/ !.github/
+
+*.code-workspace node_modules nbproject
+
+Unneeded package files
+.yarn/* !.yarn/patches !.yarn/releases !.yarn/plugins !.yarn/sdks !.yarn/versions .pnp.* package-lock.json *.tgz
+
+Compiled source files
+**/build **/*.tsbuildinfo *.map
+
+Windows stuff
+Thumbs.db 6
+.prettierignore @@ -0,0 +1,6 @@ .github/actions/**/.yml .github/workflows/ CHANGELOG.md package.json package-lock.json build/ 9
+.prettierrc.js @@ -0,0 +1,9 @@ module.exports = { semi: true, trailingComma: "all", singleQuote: false, printWidth: 120, useTabs: true, tabWidth: 4, endOfLine: "lf", }; 22
+.scaffold.json @@ -0,0 +1,22 @@ { "cli": true, "projectName": "zwlf-parser", "description": "Parses .zwlf files created by PC Controller and converts them into serial data", "keywords": ["Z-Wave", "PC Controller", "zwlf"], "packageManager": "yarn", "monorepo": false, "nodeVersion": 14, "tools": ["ESLint", "Prettier", "Commitlint"], "testing": "jest", "releaseScript": true, "indentation": "Tab", "quotes": "double", "authorName": "zwave-js", "authorGithub": "zwave-js", "authorEmail": "d.griesel@gmx.net", "gitRemoteProtocol": "HTTPS", "gitCommit": false, "license": "MIT License", "dependabot": false, "creatorVersion": "1.0.0" } 3
+.vscode/extensions.json @@ -0,0 +1,3 @@ { "recommendations": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"] } 10
+.vscode/settings.json @@ -0,0 +1,10 @@ { "typescript.tsdk": "node_modules/typescript/lib", "editor.formatOnSave": true, "editor.defaultFormatter": "esbenp.prettier-vscode", "[typescript]": { "editor.codeActionsOnSave": { "source.organizeImports": true } } } 21
+License.md : name: Auto Assign Issues/PRs description: Automatically add reviewers/assignees to issues/PRs when issues/PRs are opened. author: bubkoo bubkoo.wy@gmail.com inputs: GITHUB_TOKEN: description: Your GitHub token for authentication required: true CONFIG_FILE: description: Config file path relative to your repo's root. required: false runs: using: node16 main: dist/index.js branding: icon: flag color: black # gray-dark purple red orange green blue yellow black white No internet Try: Checking the network cables, modem, and router Reconnecting to Wi-Fi Running Connectivity Diagnostics ERR_INTERNET_DISCONNECTED Wi-Fi -'> MAC: 5C:FB:3A:D0:82:C9 No Wi-Fi network available Try troubleshooting steps To set up or update a connection, go to
+
+Filter changed files 2
+charts/backup/velero/Chart.yaml
+
+Copyright 2020 The Kubermatic Kubernetes Platform contributors.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+apiVersion: v1 name: velero version: 1.4.3 version: 1.4.4 appVersion: v1.4.2 description: A Helm chart for Heptio Velero keywords:
+
+kubermatic
+backup
+velero home: https://velero.io/ sources:
+https://github.com/vmware-tanzu/velero maintainers:
+name: Loodse GmbH email: support@kubermatic.com 2
+charts/backup/velero/crd/backups.yaml @@ -1,4 +1,4 @@
+This file has been generated with Velero v1.4.0. Do not edit.
+This file has been generated with Velero v1.4.2. Do not edit.
+apiVersion: apiextensions.k8s.io/v1beta1 kind: CustomResourceDefinition metadata: annotations: controller-gen.kubebuilder.io/version: v0.2.4 labels: component: velero name: backups.velero.io spec: group: velero.io names: kind: Backup listKind: BackupList plural: backups singular: backup preserveUnknownFields: false scope: Namespaced validation: openAPIV3Schema: description: Backup is a Velero resource that respresents the capture of Kubernetes cluster state at a point in time (API objects and associated volume state). properties: apiVersion: 2
+charts/backup/velero/crd/backupstoragelocations.yaml @@ -1,4 +1,4 @@
+
+This file has been generated with Velero v1.4.0. Do not edit.
+This file has been generated with Velero v1.4.2. Do not edit.
+apiVersion: apiextensions.k8s.io/v1beta1 kind: CustomResourceDefinition metadata: annotations: controller-gen.kubebuilder.io/version: v0.2.4 labels: component: velero name: backupstoragelocations.velero.io spec: group: velero.io names: kind: BackupStorageLocation listKind: BackupStorageLocationList plural: backupstoragelocations singular: backupstoragelocation preserveUnknownFields: false scope: Namespaced validation: openAPIV3Schema: description: BackupStorageLocation is a location where Velero stores backup objects. properties: apiVersion: 2
+charts/backup/velero/crd/deletebackuprequests.yaml @@ -1,4 +1,4 @@
+
+This file has been generated with Velero v1.4.0. Do not edit.
+This file has been generated with Velero v1.4.2. Do not edit.
+apiVersion: apiextensions.k8s.io/v1beta1 kind: CustomResourceDefinition metadata: annotations: controller-gen.kubebuilder.io/version: v0.2.4 labels: component: velero name: deletebackuprequests.velero.io spec: group: velero.io names: kind: DeleteBackupRequest listKind: DeleteBackupRequestList plural: deletebackuprequests singular: deletebackuprequest preserveUnknownFields: false scope: Namespaced validation: openAPIV3Schema: description: DeleteBackupRequest is a request to delete one or more backups. properties: apiVersion: description: 'APIVersion defines the versioned schema of this representation 2
+charts/backup/velero/crd/downloadrequests.yaml @@ -1,4 +1,4 @@
+
+This file has been generated with Velero v1.4.0. Do not edit.
+This file has been generated with Velero v1.4.2. Do not edit.
+apiVersion: apiextensions.k8s.io/v1beta1 kind: CustomResourceDefinition metadata: annotations: controller-gen.kubebuilder.io/version: v0.2.4 labels: component: velero name: downloadrequests.velero.io spec: group: velero.io names: kind: DownloadRequest listKind: DownloadRequestList plural: downloadrequests singular: downloadrequest preserveUnknownFields: false scope: Namespaced validation: openAPIV3Schema: description: DownloadRequest is a request to download an artifact from backup object storage, such as a backup log file. properties: apiVersion: 2
+charts/backup/velero/crd/podvolumebackups.yaml @@ -1,4 +1,4 @@
+
+This file has been generated with Velero v1.4.0. Do not edit.
+This file has been generated with Velero v1.4.2. Do not edit.
+apiVersion: apiextensions.k8s.io/v1beta1 kind: CustomResourceDefinition metadata: annotations: controller-gen.kubebuilder.io/version: v0.2.4 labels: component: velero name: podvolumebackups.velero.io spec: group: velero.io names: kind: PodVolumeBackup listKind: PodVolumeBackupList plural: podvolumebackups singular: podvolumebackup preserveUnknownFields: false scope: Namespaced validation: openAPIV3Schema: properties: apiVersion: description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest 2
+charts/backup/velero/crd/podvolumerestores.yaml @@ -1,4 +1,4 @@
+
+This file has been generated with Velero v1.4.0. Do not edit.
+This file has been generated with Velero v1.4.2. Do not edit.
+apiVersion: apiextensions.k8s.io/v1beta1 kind: CustomResourceDefinition metadata: annotations: controller-gen.kubebuilder.io/version: v0.2.4 labels: component: velero name: podvolumerestores.velero.io spec: group: velero.io names: kind: PodVolumeRestore listKind: PodVolumeRestoreList plural: podvolumerestores singular: podvolumerestore preserveUnknownFields: false scope: Namespaced validation: openAPIV3Schema: properties: apiVersion: description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest 2
+charts/backup/velero/crd/resticrepositories.yaml @@ -1,4 +1,4 @@
+
+This file has been generated with Velero v1.4.0. Do not edit.
+This file has been generated with Velero v1.4.2. Do not edit.
+apiVersion: apiextensions.k8s.io/v1beta1 kind: CustomResourceDefinition metadata: 2
+charts/backup/velero/crd/restores.yaml @@ -1,4 +1,4 @@
+
+This file has been generated with Velero v1.4.0. Do not edit.
+This file has been generated with Velero v1.4.2. Do not edit.
+apiVersion: apiextensions.k8s.io/v1beta1 kind: CustomResourceDefinition metadata: annotations: controller-gen.kubebuilder.io/version: v0.2.4 labels: component: velero name: restores.velero.io spec: group: velero.io names: kind: Restore listKind: RestoreList plural: restores singular: restore preserveUnknownFields: false scope: Namespaced validation: openAPIV3Schema: description: Restore is a Velero resource that represents the application of resources from a Velero backup to a target Kubernetes cluster. properties: apiVersion: 2
+charts/backup/velero/crd/schedules.yaml @@ -1,4 +1,4 @@
+
+This file has been generated with Velero v1.4.0. Do not edit.
+This file has been generated with Velero v1.4.2. Do not edit.
+apiVersion: apiextensions.k8s.io/v1beta1 kind: CustomResourceDefinition metadata: annotations: controller-gen.kubebuilder.io/version: v0.2.4 labels: component: velero name: schedules.velero.io spec: group: velero.io names: kind: Schedule listKind: ScheduleList plural: schedules singular: schedule preserveUnknownFields: false scope: Namespaced validation: openAPIV3Schema: description: Schedule is a Velero resource that represents a pre-scheduled or periodic Backup that should be run. properties: apiVersion: 2
+charts/backup/velero/crd/serverstatusrequests.yaml @@ -1,4 +1,4 @@
+
+This file has been generated with Velero v1.4.0. Do not edit.
+This file has been generated with Velero v1.4.2. Do not edit.
+apiVersion: apiextensions.k8s.io/v1beta1 kind: CustomResourceDefinition metadata: 2
+charts/backup/velero/crd/volumesnapshotlocations.yaml @@ -1,4 +1,4 @@
+
+This file has been generated with Velero v1.4.0. Do not edit.
+This file has been generated with Velero v1.4.2. Do not edit.
+apiVersion: apiextensions.k8s.io/v1beta1 kind: CustomResourceDefinition metadata: annotations: controller-gen.kubebuilder.io/version: v0.2.4 labels: component: velero name: volumesnapshotlocations.velero.io spec: group: velero.io names: kind: VolumeSnapshotLocation listKind: VolumeSnapshotLocationList plural: volumesnapshotlocations singular: volumesnapshotlocation preserveUnknownFields: false scope: Namespaced validation: openAPIV3Schema: description: VolumeSnapshotLocation is a location where Velero stores volume snapshots. properties: apiVersion: apiVersion: v1 #Kind :kite.u : version: 2.2.28 version: 2.2.29 appVersion: v2.20.1 description: Prometheus Monitoring for Kubernetes keywords:
+
+kubermatic
+monitoring
+prometheus
+thanos home: https://prometheus.io/ sources:
+https://github.com/helm/charts/tree/master/stable/prometheus
+https://github.com/improbable-eng/thanos/tree/master/tutorials/kubernetes-demo/manifests maintainers:
+notification
+document :
+e-mail :cr12753750bitore34173133'@gmail.com :
+0 comments on commit ddfef50 @mowjoejoejoejoe Write Preview This repository has been archived :Build::
